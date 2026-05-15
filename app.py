@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
+import sqlite3
 import fitz
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -22,6 +24,15 @@ app = Flask(__name__)
 MODELO = "gpt-4o"           # Melhor para leitura visual de layouts
 # MODELO = "gpt-4.1"        # Alternativa nova da OpenAI
 
+def init_db():
+    conn = sqlite3.connect('cache.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS analises
+                 (hash TEXT PRIMARY KEY, resultado TEXT)''')
+    conn.commit()
+    conn.close()
+
+init_db()
 
 VARIANTES = {
     "DERMO": ["DERMO", "DEMO", "PERFUMARIA"],
@@ -112,10 +123,24 @@ PARA CADA MOVEL:
 
 Retorne APENAS JSON:
 {{"itens": [{{"n": "NOME", "x": 100, "y": 100, "w": 50, "h": 200}}]}}"""
+    img_hash = hashlib.md5(b64.encode('utf-8')).hexdigest()
     
+    # Verifica cache
+    conn = sqlite3.connect('cache.db')
+    c = conn.cursor()
+    c.execute("SELECT resultado FROM analises WHERE hash=?", (img_hash,))
+    row = c.fetchone()
+    conn.close()
+    
+    if row:
+        print(f" [CACHE HIT] Usando resultado cacheado para hash {img_hash}")
+        cached_data = json.loads(row[0])
+        return cached_data["validos"], cached_data["content"]
+        
     prompt = base_prompt.replace("{lista}", str(LISTA_OFFICIAL))
         
     try:
+        print(f" [IA] Consultando modelo de visão para novo recorte...")
         resp = client.chat.completions.create(
             model=MODELO,
             temperature=0.0,
@@ -141,6 +166,15 @@ Retorne APENAS JSON:
                         "w": it.get("w", 20),
                         "h": it.get("h", 20)
                     })
+            
+            # Salva no cache
+            conn = sqlite3.connect('cache.db')
+            c = conn.cursor()
+            c.execute("INSERT OR REPLACE INTO analises VALUES (?, ?)", 
+                      (img_hash, json.dumps({"validos": validos, "content": content})))
+            conn.commit()
+            conn.close()
+            
             return validos, content
         except json.JSONDecodeError:
             return [], content
@@ -156,12 +190,12 @@ def analisar_recorte(img, rotacoes, crop_x, crop_y):
 
     all_raw = []
     textos = []
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(analisar_recorte_ia, b64, 0) for _ in range(2)]
-        for f in futures:
-            items, txt = f.result()
-            all_raw.extend(items)
-            textos.append(txt)
+    
+    # Como adicionamos seed=42, a IA é determinística. Fazer 2 runs retornaria o mesmo resultado e gastaria 2x tokens.
+    # Fazemos apenas 1 run com precisão total, apoiado pelo cache.
+    items, txt = analisar_recorte_ia(b64, 0)
+    all_raw.extend(items)
+    textos.append(txt)
 
     itens_globais = []
     for it in all_raw:
