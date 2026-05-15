@@ -427,7 +427,7 @@ function atualizarLista() {
   
   // Salva no LocalStorage (chave inclui o nome do arquivo e a pagina atual)
     if (currentFilename) {
-    const pagina = document.getElementById('num-pagina').textContent;
+    const pagina = document.getElementById('inp-pagina').value;
     localStorage.setItem('recortes_' + currentFilename + '_p' + pagina, JSON.stringify(recortes));
     localStorage.setItem('recortes_' + currentFilename, JSON.stringify(recortes)); // Backup geral
   }
@@ -443,7 +443,7 @@ function salvarManual() {
 
 function carregarManual() {
   if (!currentFilename) { alert("Selecione um PDF primeiro"); return; }
-  const pagina = document.getElementById('num-pagina').textContent;
+  const pagina = document.getElementById('inp-pagina').value;
   const pKey = 'recortes_' + currentFilename + '_p' + pagina;
   const gKey = 'recortes_' + currentFilename;
   let saved = localStorage.getItem(pKey) || localStorage.getItem(gKey);
@@ -461,7 +461,7 @@ function carregarManual() {
 
 function limparTudo() {
   if (confirm("Deseja apagar todas as marcações desta página?")) {
-    const pagina = document.getElementById('num-pagina').textContent;
+    const pagina = document.getElementById('inp-pagina').value;
     recortes = [];
     selecionadoId = null;
     if (currentFilename) localStorage.removeItem('recortes_' + currentFilename + '_p' + pagina);
@@ -517,7 +517,7 @@ async function analisar() {
     const r = await fetch('/analisar/canvas', { method: 'POST', body: fd });
     const data = await r.json();
     if (data.erro) { alert(data.erro); return; }
-    mostrarResultado(data.inventario, data.total, data.debug_logs);
+    mostrarResultado(data.inventario, data.total, data.logs);
     document.getElementById('btn-excel').style.display = 'block';
   } catch(e) {
     alert('Erro na análise. Verifique o servidor.');

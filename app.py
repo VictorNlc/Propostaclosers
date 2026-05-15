@@ -341,20 +341,7 @@ def exportar_excel():
     return send_file(buf, as_attachment=True, download_name=filename,
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-@app.route("/analisar/recortes", methods=["POST"])
-def analisar_recortes():
-    """Modo legado: upload de imagens pre-cortadas."""
-    files = request.files.getlist("imagens")
-    if not files:
-        return jsonify({"erro": "Nenhuma imagem enviada"}), 400
-    contagem = Counter()
-    for f in files:
-        img = Image.open(f.stream).convert("RGB")
-        resultado = analisar_com_consenso_rotacao(img, [0, 90, 180, 270])
-        for nome, qtd in resultado.items():
-            contagem[nome] += qtd
-    inventario = [{"nome": k, "quantidade": v} for k, v in sorted(contagem.items())]
-    return jsonify({"inventario": inventario, "total": sum(contagem.values())})
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
