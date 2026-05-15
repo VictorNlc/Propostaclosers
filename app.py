@@ -113,16 +113,14 @@ def pil_to_b64(img):
 
 def analisar_recorte_ia(b64, prompt_idx, custom_prompt=None):
     """Analisa um recorte e retorna caixas delimitadoras (x, y, w, h)."""
-    base_prompt = """VOCE EH UM ESPECIALISTA EM INVENTARIO.
+    base_prompt = """VOCE EH UM AUDITOR INFALIVEL.
 Conte os moveis desta LISTA: {lista}.
 
-PARA CADA MOVEL:
-1. Identifique o retangulo exato do movel.
-2. Leia o texto interno (ex: "MED 807mm").
-3. Retorne a caixa delimitadora (x, y, largura, altura) em escala 0-1000.
+REGRA CRITICA: Apenas conte a QUANTIDADE de cada item que voce consegue ler claramente.
+Ignore medidas de paredes.
 
 Retorne APENAS JSON:
-{{"itens": [{{"n": "NOME", "x": 100, "y": 100, "w": 50, "h": 200}}]}}"""
+{{"inventario": [{{"nome": "NOME DO MOVEL", "quantidade": 2}}]}}"""
     img_hash = hashlib.md5(b64.encode('utf-8')).hexdigest()
     
     # Verifica cache
@@ -154,67 +152,50 @@ Retorne APENAS JSON:
         content = resp.choices[0].message.content or "{}"
         try:
             data = json.loads(content)
-            raw_itens = data.get("itens", [])
-            validos = []
+            raw_itens = data.get("inventario", [])
+            contagem = Counter()
             for it in raw_itens:
-                nome = extrair_id(it.get("n", ""))
+                nome = extrair_id(it.get("nome", ""))
                 if nome:
-                    validos.append({
-                        "nome": nome,
-                        "x": it.get("x", 0),
-                        "y": it.get("y", 0),
-                        "w": it.get("w", 20),
-                        "h": it.get("h", 20)
-                    })
+                    contagem[nome] += it.get("quantidade", 1)
             
             # Salva no cache
             conn = sqlite3.connect('cache.db')
             c = conn.cursor()
             c.execute("INSERT OR REPLACE INTO analises VALUES (?, ?)", 
-                      (img_hash, json.dumps({"validos": validos, "content": content})))
+                      (img_hash, json.dumps({"validos": dict(contagem), "content": content})))
             conn.commit()
             conn.close()
             
-            return validos, content
+            return dict(contagem), content
         except json.JSONDecodeError:
-            return [], content
+            return {}, content
     except Exception as e:
-        return [], str(e)
+        return {}, str(e)
 
 def analisar_recorte(img, rotacoes, crop_x, crop_y):
-    """Processa recorte com caixas delimitadoras."""
-    ang = rotacoes[0] if rotacoes else 0
-    rot = img if ang == 0 else img.rotate(ang, expand=True)
-    w_px, h_px = rot.size
-    b64 = pil_to_b64(rot)
-
-    all_raw = []
+    """Processa recorte. Agora roda para TODAS as rotacoes selecionadas e pega o valor maximo (evita contar o mesmo item 2x)."""
+    if not rotacoes: rotacoes = [0]
+    
+    max_counts = Counter()
     textos = []
     
-    # Como adicionamos seed=42, a IA é determinística. Fazer 2 runs retornaria o mesmo resultado e gastaria 2x tokens.
-    # Fazemos apenas 1 run com precisão total, apoiado pelo cache.
-    items, txt = analisar_recorte_ia(b64, 0)
-    all_raw.extend(items)
-    textos.append(txt)
-
-    itens_globais = []
-    for it in all_raw:
-        # Converte 0-1000 -> Pixels -> PDF Units
-        gx = crop_x + (it["x"] / 1000.0) * w_px
-        gy = crop_y + (it["y"] / 1000.0) * h_px
-        gw = (it["w"] / 1000.0) * w_px
-        gh = (it["h"] / 1000.0) * h_px
-        
-        itens_globais.append({
-            "nome": it["nome"],
-            "x1": gx, "y1": gy,
-            "x2": gx + gw, "y2": gy + gh
-        })
-
     os.makedirs("debug", exist_ok=True)
     img_path = f"debug/crop_{int(time.time()*1000)}.png"
-    rot.save(img_path)
-    return itens_globais, textos[0], img_path
+    img.save(img_path)
+
+    for ang in rotacoes:
+        rot = img if ang == 0 else img.rotate(ang, expand=True)
+        b64 = pil_to_b64(rot)
+        
+        contagem, txt = analisar_recorte_ia(b64, 0)
+        textos.append(f"[{ang} graus]: " + txt)
+        
+        for k, v in contagem.items():
+            if v > max_counts[k]:
+                max_counts[k] = v
+
+    return max_counts, "\n".join(textos), img_path
 
 @app.route("/")
 def index():
@@ -274,7 +255,7 @@ def analisar_canvas():
         ZOOM_IA = 18.0
         scale_x = scale_y = 2.0
 
-        todos_itens_pag = []
+        itens_finais = Counter()
         logs = []
         
         for i, r in enumerate(recortes):
@@ -289,31 +270,11 @@ def analisar_canvas():
             crop_img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             doc_local.close()
             
-            resultado_itens, texto_ia, path_img = analisar_recorte(crop_img, r.get("rotacoes", [0]), x1_pdf, y1_pdf)
-            todos_itens_pag.extend(resultado_itens)
+            resultado_contagem, texto_ia, path_img = analisar_recorte(crop_img, r.get("rotacoes", [0]), x1_pdf, y1_pdf)
+            for k, v in resultado_contagem.items():
+                itens_finais[k] += v
+                
             logs.append({"recorte": i+1, "texto": texto_ia, "imagem": path_img})
-
-        # --- DEDUPLICAÇÃO POR IoU ---
-        itens_finais = Counter()
-        ja_processados = [False] * len(todos_itens_pag)
-        IOU_THRESHOLD = 0.3 # Se sobrepor 30%, eh o mesmo movel
-
-        for i in range(len(todos_itens_pag)):
-            if ja_processados[i]: continue
-            it1 = todos_itens_pag[i]
-            itens_finais[it1["nome"]] += 1
-            ja_processados[i] = True
-            
-            box1 = (it1["x1"], it1["y1"], it1["x2"], it1["y2"])
-            
-            for j in range(i + 1, len(todos_itens_pag)):
-                if ja_processados[j]: continue
-                it2 = todos_itens_pag[j]
-                if it1["nome"] == it2["nome"]:
-                    box2 = (it2["x1"], it2["y1"], it2["x2"], it2["y2"])
-                    iou = calcular_iou(box1, box2)
-                    if iou > IOU_THRESHOLD:
-                        ja_processados[j] = True
 
         inventario = [{"nome": k, "quantidade": v} for k, v in sorted(itens_finais.items())]
         return jsonify({"inventario": inventario, "total": sum(itens_finais.values()), "logs": logs})
