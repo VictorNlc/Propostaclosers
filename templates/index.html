@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projefarma · Inventário de Layout</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+header{background:linear-gradient(135deg,#1a1f3a,#0d1117);padding:18px 32px;display:flex;align-items:center;gap:16px;border-bottom:1px solid #30363d}
+header h1{font-size:1.3rem;font-weight:700;background:linear-gradient(90deg,#00d4ff,#7b61ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+header span{font-size:.85rem;color:#8b949e;margin-left:auto}
+
+.container{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(100vh - 65px)}
+
+/* PAINEL ESQUERDO */
+.sidebar{background:#161b22;border-right:1px solid #30363d;padding:20px;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
+.card{background:#1c2333;border:1px solid #30363d;border-radius:12px;padding:16px}
+.card h3{font-size:.85rem;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+
+label{display:block;font-size:.8rem;color:#8b949e;margin-bottom:6px}
+input[type=file],input[type=number],input[type=text]{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:9px 12px;color:#e6edf3;font-size:.9rem;outline:none}
+input[type=file]{cursor:pointer}
+input[type=number]{width:80px}
+input:focus{border-color:#00d4ff}
+
+.btn{width:100%;padding:11px;border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:linear-gradient(135deg,#00d4ff,#7b61ff);color:#fff}
+.btn-primary:hover{opacity:.88;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-success{background:linear-gradient(135deg,#00c853,#00897b);color:#fff;margin-top:8px}
+.btn-success:hover{opacity:.88}
+.btn-outline{background:transparent;border:1px solid #30363d;color:#8b949e;font-size:.8rem;padding:7px 12px;border-radius:8px;cursor:pointer}
+.btn-outline:hover{border-color:#00d4ff;color:#00d4ff}
+
+.row{display:flex;align-items:center;gap:10px}
+
+/* LISTA DE RECORTES */
+#lista-recortes{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto}
+.recorte-item{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;font-size:.8rem}
+.recorte-item .num{background:#00d4ff22;color:#00d4ff;font-weight:700;border-radius:4px;padding:2px 7px;min-width:28px;text-align:center}
+.recorte-item .rot-btns{display:flex;gap:3px;margin-left:auto}
+.rot-btn{background:#1c2333;border:1px solid #30363d;color:#8b949e;border-radius:5px;padding:3px 6px;font-size:.72rem;cursor:pointer}
+.rot-btn.ativo{background:#7b61ff;border-color:#7b61ff;color:#fff}
+.recorte-item.selecionado{border-color:#7b61ff;background:#7b61ff11;box-shadow:0 0 10px #7b61ff33}
+.recorte-item.selecionado .num{background:#7b61ff;color:#fff}
+.del-btn{background:#ff454522;border:none;color:#ff4545;border-radius:5px;padding:3px 7px;cursor:pointer;font-size:.8rem}
+
+.spinner{display:none;text-align:center;padding:12px;color:#8b949e;font-size:.85rem}
+.spinner.show{display:block}
+
+/* ÁREA DO CANVAS */
+.canvas-area{background:#0d1117;display:flex;flex-direction:column}
+.canvas-toolbar{background:#161b22;border-bottom:1px solid #30363d;padding:10px 16px;display:flex;align-items:center;gap:12px}
+.canvas-toolbar span{font-size:.8rem;color:#8b949e}
+.badge{background:#00d4ff22;color:#00d4ff;border-radius:20px;padding:3px 10px;font-size:.75rem;font-weight:600}
+
+#canvas-wrap{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:flex-start;padding:16px;position:relative}
+#canvas-pdf{cursor:crosshair;display:block;max-width:100%;user-select:none}
+#placeholder{color:#8b949e;text-align:center;padding:80px 20px;font-size:.9rem;line-height:1.8;margin:auto}
+#placeholder .icon{font-size:3rem;margin-bottom:12px}
+
+/* RESULTADOS */
+.results-panel{background:#161b22;border-top:1px solid #30363d;padding:16px;max-height:260px;overflow-y:auto;display:none}
+.results-panel.show{display:block}
+.results-panel h3{font-size:.85rem;font-weight:600;color:#8b949e;text-transform:uppercase;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{background:#1c2333;padding:8px 12px;text-align:left;color:#8b949e;font-weight:600;font-size:.78rem}
+td{padding:7px 12px;border-bottom:1px solid #21262d}
+tr:hover td{background:#1c233344}
+.qty{font-weight:700;color:#00d4ff}
+.total-row td{font-weight:700;border-top:2px solid #30363d;color:#e6edf3}
+
+.nome-cliente{display:flex;gap:8px;align-items:center}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>⚡ Projefarma · Inventário Inteligente</h1>
+  </div>
+  <span id="status-badge">Aguardando PDF...</span>
+</header>
+
+<div class="container">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <div class="card">
+      <h3>1 · Carregar Layout</h3>
+      <label>Arquivo PDF</label>
+      <input type="file" id="inp-pdf" accept=".pdf">
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label>Página</label>
+          <input type="number" id="inp-pagina" value="1" min="1">
+        </div>
+        <div style="flex:1;margin-top:18px">
+          <button class="btn btn-outline" onclick="carregarPDF()" id="btn-carregar">Renderizar ▶</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>2 · Recortes <span id="count-badge" class="badge">0</span></h3>
+      <p style="font-size:.78rem;color:#8b949e;margin-bottom:10px">Arraste retângulos sobre o layout. Clique nos graus para definir a rotação de cada área.</p>
+      <div id="lista-recortes"><p style="color:#8b949e;font-size:.78rem;text-align:center;padding:10px">Nenhum recorte ainda</p></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <button class="btn" onclick="salvarManual()" style="background:#238636;color:white;font-size:0.75rem">💾 SALVAR AGORA</button>
+          <button class="btn btn-outline" style="border-color:#7b61ff;color:#7b61ff;font-size:0.75rem" onclick="carregarManual()">🔄 RESTAURAR</button>
+      </div>
+      <button class="btn btn-outline" style="margin-top:8px;width:100%;font-size:0.75rem;border-color:#ff454555;color:#ff4545" onclick="limparRecortes()">🗑 Limpar tudo</button>
+    </div>
+
+    <div class="card">
+      <h3>3 · Analisar</h3>
+      <div class="nome-cliente">
+        <div style="flex:1">
+          <label>Nome do cliente</label>
+          <input type="text" id="inp-cliente" placeholder="Ex: Wilton Top Farma">
+        </div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:12px" onclick="analisar()" id="btn-analisar" disabled>
+        🔍 Analisar Recortes
+      </button>
+      <button class="btn btn-success" onclick="exportarExcel()" id="btn-excel" style="display:none">
+        📥 Exportar Excel
+      </button>
+      <div class="spinner" id="spinner">⏳ Analisando... aguarde</div>
+    </div>
+
+  </div>
+
+  <!-- CANVAS AREA -->
+  <div class="canvas-area">
+    <div class="canvas-toolbar">
+      <span>🖱 <strong>Arraste</strong> para criar recorte &nbsp;|&nbsp; <strong>Clique direito</strong> no recorte para remover</span>
+      <span id="coord-info" class="badge" style="margin-left:auto">—</span>
+    </div>
+
+    <div id="canvas-wrap">
+      <div id="placeholder">
+        <div class="icon">📐</div>
+        <strong>Carregue um PDF para começar</strong><br>
+        Selecione o arquivo e a página, depois clique em <strong>Renderizar ▶</strong>
+      </div>
+      <canvas id="canvas-pdf" style="display:none"></canvas>
+    </div>
+
+    <div class="results-panel" id="results-panel">
+      <h3>Inventário Detectado</h3>
+      <table id="tabela-resultado">
+        <thead><tr><th>Produto</th><th>Quantidade</th></tr></thead>
+        <tbody id="tbody-resultado"></tbody>
+      </table>
+
+      <h3 style="margin-top:24px; color:#7b61ff">Raciocínio da IA (Por Recorte)</h3>
+      <div id="ai-logs" style="font-size:0.8rem; color:#8b949e; line-height:1.4"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas-pdf');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvas-wrap');
+
+let currentFilename = "";
+let pdfImageData = null;
+let recortes = [];
+let desenhando = false;
+let arrastando = null;
+let startImgX, startImgY, currentRect = null;
+let offsetArrastarX = 0, offsetArrastarY = 0;
+let selecionadoId = null;
+let idCounter = 0;
+
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+let isPanning = false;
+let panStartX, panStartY;
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 20;
+
+function screenToImg(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  return {
+    x: Math.round((sx - offsetX) / scale),
+    y: Math.round((sy - offsetY) / scale)
+  };
+}
+
+async function carregarPDF() {
+  const file = document.getElementById('inp-pdf').files[0];
+  if (!file) { alert('Selecione um arquivo PDF primeiro.'); return; }
+  currentFilename = file.name;
+  const pagina = document.getElementById('inp-pagina').value;
+  document.getElementById('status-badge').textContent = 'Renderizando...';
+  document.getElementById('btn-carregar').disabled = true;
+
+  const fd = new FormData();
+  fd.append('pdf', file);
+  fd.append('pagina', pagina);
+
+  try {
+    const r = await fetch('/renderizar-pdf', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (data.erro) { alert(data.erro); return; }
+
+    const pKey = 'recortes_' + currentFilename + '_p' + pagina;
+    const gKey = 'recortes_' + currentFilename;
+    let saved = localStorage.getItem(pKey) || localStorage.getItem(gKey);
+    
+    console.log("Tentando carregar:", pKey, "ou", gKey, "Encontrado:", !!saved);
+    recortes = saved ? JSON.parse(saved) : [];
+    idCounter = recortes.length > 0 ? Math.max(...recortes.map(r => r.id)) + 1 : 1;
+
+    document.getElementById('placeholder').style.display = 'none';
+    canvas.style.display = 'block';
+
+    const wrapW = wrap.clientWidth - 32;
+    const wrapH = wrap.clientHeight - 32;
+    canvas.width = wrapW;
+    canvas.height = wrapH;
+
+    const img = new Image();
+    img.onload = () => {
+      pdfImageData = img;
+      // Fit inicial: encaixa a imagem no canvas
+      const fitScale = Math.min(wrapW / img.width, wrapH / img.height, 1);
+      scale = fitScale;
+      offsetX = (wrapW - img.width * scale) / 2;
+      offsetY = (wrapH - img.height * scale) / 2;
+      redraw();
+      document.getElementById('status-badge').textContent = `Página ${pagina} · ${data.paginas} páginas · Scroll=zoom  Dir=mover`;
+    };
+    img.src = 'data:image/png;base64,' + data.imagem;
+  } catch(e) {
+    alert('Erro ao carregar PDF.');
+  } finally {
+    document.getElementById('btn-carregar').disabled = false;
+  }
+}
+
+// ── ZOOM com scroll ───────────────────────────────────────
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (!pdfImageData) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.12 : 0.89;
+  const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
+  // Zoom centrado no cursor
+  offsetX = mx - (mx - offsetX) * (newScale / scale);
+  offsetY = my - (my - offsetY) * (newScale / scale);
+  scale = newScale;
+  document.getElementById('coord-info').textContent = `Zoom ${(scale * 100).toFixed(0)}%`;
+  redraw();
+}, { passive: false });
+
+// ── PAN com botão direito ─────────────────────────────────
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 2) {
+    isPanning = true;
+    panStartX = e.clientX - offsetX;
+    panStartY = e.clientY - offsetY;
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+  if (!pdfImageData || e.button !== 0) return;
+
+  const pos = screenToImg(e);
+  
+  // Verifica se clicou em algum recorte existente (para mover)
+  const sobRecorte = [...recortes].reverse().find(r => 
+    pos.x >= r.x && pos.x <= r.x + r.width &&
+    pos.y >= r.y && pos.y <= r.y + r.height
+  );
+
+  if (sobRecorte) {
+    arrastando = sobRecorte;
+    selecionadoId = sobRecorte.id;
+    offsetArrastarX = pos.x - sobRecorte.x;
+    offsetArrastarY = pos.y - sobRecorte.y;
+    canvas.style.cursor = 'move';
+    atualizarLista();
+    redraw();
+  } else {
+    desenhando = true;
+    selecionadoId = null;
+    startImgX = pos.x; startImgY = pos.y;
+    currentRect = null;
+    atualizarLista();
+    redraw();
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (isPanning) {
+    offsetX = e.clientX - panStartX;
+    offsetY = e.clientY - panStartY;
+    redraw();
+    return;
+  }
+  const pos = screenToImg(e);
+  document.getElementById('coord-info').textContent = `x:${pos.x} y:${pos.y}  Zoom ${(scale*100).toFixed(0)}%`;
+
+  if (arrastando) {
+    arrastando.x = pos.x - offsetArrastarX;
+    arrastando.y = pos.y - offsetArrastarY;
+    redraw();
+    atualizarLista();
+    return;
+  }
+
+  // Cursor pointer se estiver sobre um recorte
+  const sobRecorte = recortes.find(r => 
+    pos.x >= r.x && pos.x <= r.x + r.width &&
+    pos.y >= r.y && pos.y <= r.y + r.height
+  );
+  canvas.style.cursor = sobRecorte ? 'move' : 'crosshair';
+
+  if (!desenhando) return;
+  currentRect = {
+    x: Math.min(startImgX, pos.x), y: Math.min(startImgY, pos.y),
+    width: Math.abs(pos.x - startImgX), height: Math.abs(pos.y - startImgY)
+  };
+  redraw();
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (e.button === 2) {
+    isPanning = false;
+    canvas.style.cursor = 'crosshair';
+    return;
+  }
+  
+  if (arrastando) {
+    arrastando = null;
+    return;
+  }
+
+  if (!desenhando) return;
+  desenhando = false;
+  if (currentRect && currentRect.width > 5 && currentRect.height > 5) {
+    idCounter++;
+    recortes.push({ ...currentRect, id: idCounter, rotacoes: [0] });
+    currentRect = null;
+    atualizarLista();
+    redraw();
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (isPanning) { isPanning = false; canvas.style.cursor = 'crosshair'; }
+});
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// ── REDESENHAR ────────────────────────────────────────────
+function redraw() {
+  if (!pdfImageData) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
+
+  // Imagem
+  ctx.drawImage(pdfImageData, 0, 0);
+
+  // Recortes salvos (coords de imagem)
+  recortes.forEach(r => {
+    const isSel = r.id === selecionadoId;
+    ctx.strokeStyle = isSel ? '#7b61ff' : '#00d4ff';
+    ctx.lineWidth = (isSel ? 4 : 2) / scale;
+    ctx.strokeRect(r.x, r.y, r.width, r.height);
+    ctx.fillStyle = isSel ? '#7b61ff11' : '#00d4ff22';
+    ctx.fillRect(r.x, r.y, r.width, r.height);
+    ctx.fillStyle = isSel ? '#7b61ff' : '#00d4ff';
+    ctx.font = `bold ${13 / scale}px Inter`;
+    ctx.fillText(`#${r.id}  ${r.rotacoes.join('°,')}°`, r.x + 4 / scale, r.y + 14 / scale);
+  });
+
+  // Recorte sendo desenhado agora
+  if (currentRect) {
+    ctx.strokeStyle = '#7b61ff';
+    ctx.lineWidth = 2 / scale;
+    ctx.setLineDash([6 / scale, 3 / scale]);
+    ctx.strokeRect(currentRect.x, currentRect.y, currentRect.width, currentRect.height);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#7b61ff22';
+    ctx.fillRect(currentRect.x, currentRect.y, currentRect.width, currentRect.height);
+  }
+
+  ctx.restore();
+}
+
+// ── LISTA DE RECORTES ─────────────────────────────────────
+function atualizarLista() {
+  const lista = document.getElementById('lista-recortes');
+  document.getElementById('count-badge').textContent = recortes.length;
+  document.getElementById('btn-analisar').disabled = recortes.length === 0;
+  if (recortes.length === 0) {
+    lista.innerHTML = '<p style="color:#8b949e;font-size:.78rem;text-align:center;padding:10px">Nenhum recorte ainda</p>';
+    return;
+  }
+  lista.innerHTML = recortes.map(r => `
+    <div class="recorte-item ${r.id === selecionadoId ? 'selecionado' : ''}" id="item-recorte-${r.id}" onclick="selecionarPorLista(${r.id})">
+      <span class="num">#${r.id}</span>
+      <span style="color:#e6edf3;flex:1">${r.width}×${r.height}</span>
+      <div class="rot-btns">
+        ${[0,90,180,270].map(a => `<button class="rot-btn ${r.rotacoes.includes(a)?'ativo':''}" onclick="event.stopPropagation(); toggleRot(${r.id},${a})">${a}°</button>`).join('')}
+      </div>
+      <button class="del-btn" onclick="event.stopPropagation(); removerRecorte(${r.id})">✕</button>
+    </div>`).join('');
+
+  if (selecionadoId) {
+    const el = document.getElementById(`item-recorte-${selecionadoId}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  
+  // Salva no LocalStorage (chave inclui o nome do arquivo e a pagina atual)
+    if (currentFilename) {
+    const pagina = document.getElementById('num-pagina').textContent;
+    localStorage.setItem('recortes_' + currentFilename + '_p' + pagina, JSON.stringify(recortes));
+    localStorage.setItem('recortes_' + currentFilename, JSON.stringify(recortes)); // Backup geral
+  }
+}
+
+function salvarManual() {
+  console.log("Botao Salvar clicado. Arquivo:", currentFilename);
+  if (!currentFilename) { alert("Selecione um PDF primeiro"); return; }
+  atualizarLista();
+  console.log("Salvo com sucesso no LocalStorage.");
+  alert("Marcações salvas com sucesso!");
+}
+
+function carregarManual() {
+  if (!currentFilename) { alert("Selecione um PDF primeiro"); return; }
+  const pagina = document.getElementById('num-pagina').textContent;
+  const pKey = 'recortes_' + currentFilename + '_p' + pagina;
+  const gKey = 'recortes_' + currentFilename;
+  let saved = localStorage.getItem(pKey) || localStorage.getItem(gKey);
+  
+  if (saved) {
+    recortes = JSON.parse(saved);
+    idCounter = recortes.length > 0 ? Math.max(...recortes.map(r => r.id)) + 1 : 1;
+    redraw();
+    atualizarLista();
+    alert("Marcações restauradas!");
+  } else {
+    alert("Nenhuma marcação encontrada para este arquivo.");
+  }
+}
+
+function limparTudo() {
+  if (confirm("Deseja apagar todas as marcações desta página?")) {
+    const pagina = document.getElementById('num-pagina').textContent;
+    recortes = [];
+    selecionadoId = null;
+    if (currentFilename) localStorage.removeItem('recortes_' + currentFilename + '_p' + pagina);
+    atualizarLista();
+    redraw();
+  }
+}
+
+function selecionarPorLista(id) {
+  selecionadoId = id;
+  atualizarLista();
+  redraw();
+}
+
+function toggleRot(id, angulo) {
+  const r = recortes.find(x => x.id === id);
+  if (!r) return;
+  if (r.rotacoes.includes(angulo)) {
+    if (r.rotacoes.length > 1) r.rotacoes = r.rotacoes.filter(a => a !== angulo);
+  } else {
+    r.rotacoes.push(angulo);
+  }
+  atualizarLista(); redraw();
+}
+
+function removerRecorte(id) {
+  recortes = recortes.filter(r => r.id !== id);
+  atualizarLista(); redraw();
+}
+
+function limparRecortes() {
+  recortes = []; idCounter = 0;
+  atualizarLista(); redraw();
+}
+
+// ── ANALISAR ──────────────────────────────────────────────
+async function analisar() {
+  const file = document.getElementById('inp-pdf').files[0];
+  if (!file || recortes.length === 0) return;
+  const pagina = document.getElementById('inp-pagina').value;
+
+  document.getElementById('spinner').classList.add('show');
+  document.getElementById('btn-analisar').disabled = true;
+  document.getElementById('btn-excel').style.display = 'none';
+  document.getElementById('results-panel').classList.remove('show');
+
+  const fd = new FormData();
+  fd.append('pdf', file);
+  fd.append('pagina', pagina);
+  fd.append('recortes', JSON.stringify(recortes));
+
+  try {
+    const r = await fetch('/analisar/canvas', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (data.erro) { alert(data.erro); return; }
+    mostrarResultado(data.inventario, data.total, data.debug_logs);
+    document.getElementById('btn-excel').style.display = 'block';
+  } catch(e) {
+    alert('Erro na análise. Verifique o servidor.');
+  } finally {
+    document.getElementById('spinner').classList.remove('show');
+    document.getElementById('btn-analisar').disabled = false;
+  }
+}
+
+function mostrarResultado(inventario, total, logs) {
+  const tbody = document.getElementById('tbody-resultado');
+  tbody.innerHTML = inventario.map(i => `
+    <tr>
+      <td>${i.nome}</td>
+      <td class="qty">${i.quantidade}</td>
+    </tr>`).join('') + `<tr class="total-row"><td>TOTAL</td><td class="qty">${total}</td></tr>`;
+  
+  const logDiv = document.getElementById('ai-logs');
+  logDiv.innerHTML = (logs || []).map(l => `
+    <div style="margin-bottom:15px; padding:10px; background:#0d1117; border-left:3px solid #7b61ff">
+      <div style="font-weight:600; color:#e6edf3; margin-bottom:4px">Recorte #${l.recorte}</div>
+      <div style="white-space:pre-wrap">${l.texto}</div>
+      <a href="/debug_img/${l.imagem.split('/').pop()}" target="_blank" style="color:#00d4ff; font-size:0.75rem">🖼 Ver imagem enviada para IA</a>
+    </div>
+  `).join('');
+
+  document.getElementById('results-panel').classList.add('show');
+}
+
+// ── EXPORTAR EXCEL ────────────────────────────────────────
+async function exportarExcel() {
+  const rows = document.querySelectorAll('#tbody-resultado tr:not(.total-row)');
+  const inventario = Array.from(rows).map(r => ({
+    nome: r.cells[0].textContent, quantidade: parseInt(r.cells[1].textContent)
+  }));
+  const cliente = document.getElementById('inp-cliente').value || 'Proposta';
+  const r = await fetch('/exportar/excel', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ inventario, cliente })
+  });
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `inventario_${cliente.replace(/\s/g,'_')}.xlsx`;
+  a.click();
+}
+</script>
+</body>
+</html>

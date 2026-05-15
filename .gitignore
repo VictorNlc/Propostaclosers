@@ -1,0 +1,6 @@
+.env
+__pycache__/
+debug/
+meus_recortes/
+scratch/
+*.json
